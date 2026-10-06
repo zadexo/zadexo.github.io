@@ -4,98 +4,38 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Смета / Коммерческое предложение</title>
+
+  <!-- 🔑 Подключение Grist Plugin API -->
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+
   <style>
-    /* === Базовые стили === */
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      font-size: 14px;
-      line-height: 1.4;
-      color: #1a1a1a;
-      background: #ffffff;
-      padding: 16px;
+      font-size: 14px; line-height: 1.4; color: #1a1a1a;
+      background: #fff; padding: 16px;
     }
-    h2 {
-      margin-bottom: 12px;
-      font-size: 20px;
-      font-weight: 600;
-    }
-    .status {
-      padding: 12px;
-      background: #f5f5f5;
-      border-radius: 6px;
-      margin-bottom: 16px;
-      color: #666;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 8px;
-      font-size: 13px;
-    }
-    th, td {
-      border: 1px solid #d0d0d0;
-      padding: 6px 8px;
-      text-align: left;
-      vertical-align: top;
-    }
-    th {
-      background: #f0f0f0;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-    .num {
-      text-align: right;
-      white-space: nowrap;
-    }
-    .group-header {
-      background: #e8e8e8;
-      font-weight: 600;
-      font-size: 14px;
-    }
-    .total-row {
-      background: #fafafa;
-      font-weight: 600;
-    }
-    .total-row td {
-      border-top: 2px solid #999;
-    }
-    .hint {
-      color: #999;
-      font-size: 12px;
-      margin-top: 8px;
-    }
-    /* Тёмная тема */
+    .status { padding: 12px; background: #f5f5f5; border-radius: 6px; margin-bottom: 16px; color: #666; }
+    .status.error { background: #ffe5e5; color: #a00; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+    th, td { border: 1px solid #d0d0d0; padding: 6px 8px; text-align: left; vertical-align: top; }
+    th { background: #f0f0f0; font-weight: 600; white-space: nowrap; }
+    .num { text-align: right; white-space: nowrap; }
+    .group-header { background: #e8e8e8; font-weight: 600; font-size: 14px; }
+    .total-row { background: #fafafa; font-weight: 600; }
+    .total-row td { border-top: 2px solid #999; }
     @media (prefers-color-scheme: dark) {
-      body {
-        background: #1e1e1e;
-        color: #e0e0e0;
-      }
-      th {
-        background: #2d2d2d;
-      }
-      td, th {
-        border-color: #444;
-      }
-      .group-header {
-        background: #333;
-      }
-      .total-row {
-        background: #2a2a2a;
-      }
-      .status {
-        background: #2a2a2a;
-        color: #aaa;
-      }
+      body { background: #1e1e1e; color: #e0e0e0; }
+      th { background: #2d2d2d; }
+      td, th { border-color: #444; }
+      .group-header { background: #333; }
+      .total-row { background: #2a2a2a; }
+      .status { background: #2a2a2a; color: #aaa; }
+      .status.error { background: #3a1a1a; color: #ff8080; }
     }
   </style>
 </head>
 <body>
-
   <div id="app">
     <div class="status" id="status">Загрузка данных…</div>
     <div id="content"></div>
@@ -103,169 +43,96 @@
 
   <script>
     // ============================================================
-    //  НАСТРОЙКИ
+    //  НАСТРОЙКИ (измените под свой документ)
     // ============================================================
-    // Укажите названия таблиц и колонок в вашем документе Grist.
-    // Если ваши названия отличаются, измените их здесь.
-    const TABLE1 = 'Table1';       // таблица со строками (оборудование)
-    const TABLE2 = 'Table2';       // таблица с группами (разделы)
-    const TABLE3 = 'Table3';       // таблица с коэффициентами
+    const TABLE1 = 'Table1';
+    const TABLE2 = 'Table2';
+    const TABLE3 = 'Table3';
 
-    // Колонки Table1, которые используются в виджете
     const COL_T1 = {
-      id: 'id',                       // служебный ID
-      groupRef: 'Id_',               // ссылка на Table2
-      name: 'name',                   // наименование
-      unit: 'unit',                   // ед. изм.
-      count: 'count',                 // количество
-      priceWithoutVAT: 'price_without_VAT',  // цена без НДС
-      priceWithVAT: 'price_with_VAT',        // цена с НДС
-      totalWithoutVAT: 'total_without_VAT',  // всего без НДС (формула)
-      totalWithVAT: 'total_with_VAT',        // всего с НДС (формула)
-      mass: 'mass',                   // масса (необязательно)
-    };
-
-    // Колонки Table2
-    const COL_T2 = {
-      id: 'id',
+      groupRef: 'Id_',
       name: 'name',
+      unit: 'unit',
       count: 'count',
-      note: 'note',
+      priceWithoutVAT: 'price_without_VAT',
+      priceWithVAT: 'price_with_VAT',
+      totalWithoutVAT: 'total_without_VAT',
+      totalWithVAT: 'total_with_VAT',
     };
+    const COL_T2 = { name: 'name' };
 
-    // Колонки Table3 (коэффициенты)
-    const COL_T3 = {
-      id: 'id',
-      saleCoef: 'sale_coef',
-      deliverySaleCoef: 'delivery_sale_coef',
-      coef: 'coef',
-      saleProcent: 'sale_procent',
-      deliverySaleProcent: 'delivery_sale_procent',
-      deliveryPrice: 'delivery_price',
-    };
-
-    // Ставка НДС
-    const VAT_RATE = 1.22; // 22%
+    const VAT_RATE = 1.22;
 
     // ============================================================
-    //  ОСНОВНАЯ ЛОГИКА
+    //  УТИЛИТЫ
     // ============================================================
+    const statusEl = document.getElementById('status');
+    const contentEl = document.getElementById('content');
 
-    /**
-     * Форматирование числа как денежной суммы.
-     */
-    function formatMoney(value) {
-      if (value == null || isNaN(value)) return '—';
-      return Number(value).toLocaleString('ru-RU', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
+    function setStatus(text, isError = false) {
+      statusEl.textContent = text;
+      statusEl.style.display = '';
+      statusEl.classList.toggle('error', isError);
+      if (isError) console.error('[Смета]', text);
     }
 
-    /**
-     * Форматирование количества.
-     */
-    function formatCount(value) {
-      if (value == null || isNaN(value)) return '—';
-      return Number(value).toLocaleString('ru-RU', {
-        maximumFractionDigits: 2,
-      });
+    function formatMoney(v) {
+      if (v == null || isNaN(v)) return '—';
+      return Number(v).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function formatCount(v) {
+      if (v == null || isNaN(v)) return '—';
+      return Number(v).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
     }
 
-    /**
-     * Получение значения из объекта по ключу (с поддержкой вложенности).
-     */
-    function getVal(obj, key) {
-      if (!obj || !key) return undefined;
-      return obj[key];
+    /** Преобразует таблицу Grist (колонки → массивы) в массив объектов */
+    function tableToRows(table) {
+      if (!table || !table.id) return [];
+      const cols = Object.keys(table);
+      const rows = [];
+      for (let i = 0; i < table.id.length; i++) {
+        const row = {};
+        for (const c of cols) row[c] = table[c][i];
+        rows.push(row);
+      }
+      return rows;
     }
 
-    /**
-     * Главная функция рендеринга.
-     */
+    // ============================================================
+    //  РЕНДЕР
+    // ============================================================
     async function render() {
-      const statusEl = document.getElementById('status');
-      const contentEl = document.getElementById('content');
-
       try {
-        // 1. Загружаем все три таблицы
-        const [table1, table2, table3] = await Promise.all([
+        setStatus('Загрузка данных…');
+
+        const [t1, t2, t3] = await Promise.all([
           grist.docApi.fetchTable(TABLE1),
           grist.docApi.fetchTable(TABLE2),
           grist.docApi.fetchTable(TABLE3),
         ]);
 
-        // 2. Преобразуем данные в удобный формат
-        //    Table1 — массив объектов
-        const rows1 = [];
-        if (table1 && table1.id) {
-          for (let i = 0; i < table1.id.length; i++) {
-            const row = {};
-            for (const key of Object.keys(table1)) {
-              row[key] = table1[key][i];
-            }
-            rows1.push(row);
-          }
-        }
+        const rows1 = tableToRows(t1);
+        const rows2 = tableToRows(t2);
+        // rows3 не используется в текущем макете, но подгружен для будущего
 
-        //    Table2 — массив объектов
-        const rows2 = [];
-        if (table2 && table2.id) {
-          for (let i = 0; i < table2.id.length; i++) {
-            const row = {};
-            for (const key of Object.keys(table2)) {
-              row[key] = table2[key][i];
-            }
-            rows2.push(row);
-          }
-        }
-
-        //    Table3 — массив объектов
-        const rows3 = [];
-        if (table3 && table3.id) {
-          for (let i = 0; i < table3.id.length; i++) {
-            const row = {};
-            for (const key of Object.keys(table3)) {
-              row[key] = table3[key][i];
-            }
-            rows3.push(row);
-          }
-        }
-
-        // 3. Если нет данных — показываем сообщение
         if (rows1.length === 0 && rows2.length === 0) {
-          statusEl.textContent = 'Нет данных. Добавьте записи в таблицы.';
+          setStatus('Нет данных. Добавьте записи в Table1 и Table2.');
           contentEl.innerHTML = '';
           return;
         }
 
-        // 4. Создаём карту групп (Table2) для быстрого поиска
-        const groupMap = new Map();
-        rows2.forEach(g => {
-          groupMap.set(g.id, g);
+        const groupMap = new Map(rows2.map(g => [g.id, g]));
+        const grouped = new Map();
+        rows1.forEach(r => {
+          const gid = r[COL_T1.groupRef];
+          if (!grouped.has(gid)) grouped.set(gid, []);
+          grouped.get(gid).push(r);
         });
 
-        // 5. Группируем строки Table1 по ссылке Id_
-        const grouped = new Map(); // groupId -> [rows]
-        rows1.forEach(row => {
-          const gid = row[COL_T1.groupRef];
-          if (!grouped.has(gid)) {
-            grouped.set(gid, []);
-          }
-          grouped.get(gid).push(row);
-        });
-
-        // 6. Определяем порядок групп (по порядку в Table2)
-        const orderedGroups = rows2
-          .filter(g => grouped.has(g.id))
-          .map(g => g.id);
-
-        // Если есть строки без группы — добавляем их в конец
+        const orderedGroups = rows2.filter(g => grouped.has(g.id)).map(g => g.id);
         const orphanRows = rows1.filter(r => !groupMap.has(r[COL_T1.groupRef]));
 
-        // 7. Формируем HTML-таблицу
-        let html = '<table>';
-        html += `
+        let html = `<table>
           <thead>
             <tr>
               <th style="width:40px;">№</th>
@@ -278,156 +145,112 @@
               <th class="num">Всего с НДС</th>
             </tr>
           </thead>
-          <tbody>
-        `;
+          <tbody>`;
 
-        let rowIndex = 0;
-        let totalWithoutVAT = 0;
-        let totalWithVAT = 0;
+        let idx = 0;
+        let totalWithout = 0;
+        let totalWith = 0;
 
-        // --- Выводим сгруппированные строки ---
+        const emitRow = (row) => {
+          idx++;
+          const name = row[COL_T1.name] || '';
+          const unit = row[COL_T1.unit] || '';
+          const count = row[COL_T1.count] || 0;
+          const pw = row[COL_T1.priceWithoutVAT] || 0;
+          const pv = row[COL_T1.priceWithVAT] || 0;
+          const tw = row[COL_T1.totalWithoutVAT] != null ? row[COL_T1.totalWithoutVAT] : pw * count;
+          const tv = row[COL_T1.totalWithVAT] != null ? row[COL_T1.totalWithVAT] : pv * count;
+
+          totalWithout += tw;
+          totalWith += tv;
+
+          html += `<tr>
+            <td>${idx}</td>
+            <td>${name}</td>
+            <td>${unit}</td>
+            <td>${formatCount(count)}</td>
+            <td class="num">${formatMoney(pw)}</td>
+            <td class="num">${formatMoney(tw)}</td>
+            <td class="num">${formatMoney(pv)}</td>
+            <td class="num">${formatMoney(tv)}</td>
+          </tr>`;
+        };
+
         for (const gid of orderedGroups) {
-          const group = groupMap.get(gid);
-          const groupRows = grouped.get(gid) || [];
-
-          // Заголовок группы
-          html += `
-            <tr class="group-header">
-              <td colspan="8">${group[COL_T2.name] || 'Без названия'}</td>
-            </tr>
-          `;
-
-          // Строки внутри группы
-          for (const row of groupRows) {
-            rowIndex++;
-
-            const name = row[COL_T1.name] || '';
-            const unit = row[COL_T1.unit] || '';
-            const count = row[COL_T1.count] || 0;
-            const priceWithout = row[COL_T1.priceWithoutVAT] || 0;
-            const priceWith = row[COL_T1.priceWithVAT] || 0;
-            // Используем формулы из Grist, если они есть; иначе считаем вручную
-            const totalWithout = row[COL_T1.totalWithoutVAT] != null
-              ? row[COL_T1.totalWithoutVAT]
-              : priceWithout * count;
-            const totalWith = row[COL_T1.totalWithVAT] != null
-              ? row[COL_T1.totalWithVAT]
-              : priceWith * count;
-
-            totalWithoutVAT += totalWithout;
-            totalWithVAT += totalWith;
-
-            html += `
-              <tr>
-                <td>${rowIndex}</td>
-                <td>${name}</td>
-                <td>${unit}</td>
-                <td>${formatCount(count)}</td>
-                <td class="num">${formatMoney(priceWithout)}</td>
-                <td class="num">${formatMoney(totalWithout)}</td>
-                <td class="num">${formatMoney(priceWith)}</td>
-                <td class="num">${formatMoney(totalWith)}</td>
-              </tr>
-            `;
-          }
+          const g = groupMap.get(gid);
+          html += `<tr class="group-header"><td colspan="8">${g[COL_T2.name] || 'Без названия'}</td></tr>`;
+          grouped.get(gid).forEach(emitRow);
         }
 
-        // --- Строки без группы (если есть) ---
-        if (orphanRows.length > 0) {
-          html += `
-            <tr class="group-header">
-              <td colspan="8">Прочее</td>
-            </tr>
-          `;
-          for (const row of orphanRows) {
-            rowIndex++;
-            const name = row[COL_T1.name] || '';
-            const unit = row[COL_T1.unit] || '';
-            const count = row[COL_T1.count] || 0;
-            const priceWithout = row[COL_T1.priceWithoutVAT] || 0;
-            const priceWith = row[COL_T1.priceWithVAT] || 0;
-            const totalWithout = row[COL_T1.totalWithoutVAT] != null
-              ? row[COL_T1.totalWithoutVAT]
-              : priceWithout * count;
-            const totalWith = row[COL_T1.totalWithVAT] != null
-              ? row[COL_T1.totalWithVAT]
-              : priceWith * count;
-
-            totalWithoutVAT += totalWithout;
-            totalWithVAT += totalWith;
-
-            html += `
-              <tr>
-                <td>${rowIndex}</td>
-                <td>${name}</td>
-                <td>${unit}</td>
-                <td>${formatCount(count)}</td>
-                <td class="num">${formatMoney(priceWithout)}</td>
-                <td class="num">${formatMoney(totalWithout)}</td>
-                <td class="num">${formatMoney(priceWith)}</td>
-                <td class="num">${formatMoney(totalWith)}</td>
-              </tr>
-            `;
-          }
+        if (orphanRows.length) {
+          html += `<tr class="group-header"><td colspan="8">Прочее</td></tr>`;
+          orphanRows.forEach(emitRow);
         }
 
-        // --- Итоговые строки ---
-        const vatAmount = totalWithVAT - totalWithoutVAT;
+        const vatFromWithout = totalWithout * (VAT_RATE - 1);
+        const vatFromWith = totalWith - (totalWith / VAT_RATE);
 
         html += `
           <tr class="total-row">
             <td colspan="5" style="text-align:right;">Итого без НДС:</td>
-            <td class="num">${formatMoney(totalWithoutVAT)}</td>
+            <td class="num">${formatMoney(totalWithout)}</td>
             <td></td>
-            <td class="num">${formatMoney(totalWithVAT)}</td>
+            <td class="num">${formatMoney(totalWith)}</td>
           </tr>
           <tr class="total-row">
             <td colspan="5" style="text-align:right;">НДС 22%:</td>
-            <td class="num">${formatMoney(totalWithoutVAT * 0.22)}</td>
+            <td class="num">${formatMoney(vatFromWithout)}</td>
             <td></td>
-            <td class="num">${formatMoney(totalWithVAT * 0.22 / VAT_RATE * (VAT_RATE - 1))}</td>
+            <td class="num">${formatMoney(vatFromWith)}</td>
           </tr>
           <tr class="total-row">
             <td colspan="5" style="text-align:right;">Всего с НДС:</td>
-            <td class="num">${formatMoney(totalWithoutVAT * VAT_RATE)}</td>
+            <td class="num">${formatMoney(totalWithout * VAT_RATE)}</td>
             <td></td>
-            <td class="num">${formatMoney(totalWithVAT)}</td>
+            <td class="num">${formatMoney(totalWith)}</td>
           </tr>
-        `;
+        </tbody></table>`;
 
-        html += '</tbody></table>';
-
-        // 8. Выводим результат
         statusEl.style.display = 'none';
         contentEl.innerHTML = html;
 
       } catch (err) {
-        console.error('Ошибка виджета:', err);
-        statusEl.textContent = 'Ошибка загрузки данных: ' + err.message;
+        console.error('[Смета] Ошибка:', err);
+        setStatus('Ошибка: ' + (err && err.message ? err.message : String(err)), true);
         contentEl.innerHTML = '';
       }
     }
 
     // ============================================================
-    //  ИНИЦИАЛИЗАЦИЯ GRIST
+    //  ИНИЦИАЛИЗАЦИЯ
     // ============================================================
+    (async function init() {
+      try {
+        if (typeof grist === 'undefined') {
+          setStatus('Не удалось загрузить Grist Plugin API. Проверьте <script src="…grist-plugin-api.js">.', true);
+          return;
+        }
+        // Ждём готовности и запрашиваем полный доступ к документу
+        await grist.ready({ requiredAccess: 'full' });
+        console.log('[Смета] grist.ready() выполнено');
 
-    // Подключаемся к Grist и запрашиваем полный доступ на чтение документа
-    grist.ready({
-      requiredAccess: 'full', // нужен доступ ко всем таблицам
-    });
+        // Первый рендер
+        await render();
 
-    // Запускаем рендеринг
-    render();
+        // Автообновление при изменениях в выбранной таблице
+        grist.onRecords(() => { render(); });
 
-    // При изменении данных в документе — перерисовываем
-    grist.onRecords(render);
-    grist.on('message', (e) => {
-      if (e.data && e.data.type === 'recordChange') {
-        render();
+        // Дополнительно слушаем явные изменения документа
+        grist.on('message', (e) => {
+          if (e && e.data && (e.data.type === 'recordChange' || e.data.type === 'docChange')) {
+            render();
+          }
+        });
+      } catch (err) {
+        console.error('[Смета] Ошибка init:', err);
+        setStatus('Ошибка инициализации: ' + (err && err.message ? err.message : String(err)), true);
       }
-    });
-
+    })();
   </script>
 </body>
 </html>
