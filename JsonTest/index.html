@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>JSON Viewer</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #f5f5f5;
+            color: #333;
+            padding: 16px;
+            margin: 0;
+        }
+        pre {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 12px;
+            overflow: auto;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .error {
+            color: #c0392b;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <pre id="output">Загрузка данных...</pre>
+
+    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+    <script>
+        // Сообщаем Grist о готовности виджета.
+        // requiredAccess: 'full' нужен для доступа к fetchTable,
+        // так как этот метод требует полного доступа к документу.
+        grist.ready({ requiredAccess: 'full' });
+
+        async function loadAllData() {
+            const output = document.getElementById('output');
+            try {
+                // Получаем список всех таблиц в документе
+                const tables = await grist.docApi.listTables();
+                
+                // Если таблиц нет, выводим пустой объект
+                if (!tables || tables.length === 0) {
+                    output.textContent = JSON.stringify({}, null, 2);
+                    return;
+                }
+
+                // Собираем данные со всех таблиц в один объект.
+                // Ключом будет имя таблицы, значением — её данные.
+                const allData = {};
+                for (const tableId of tables) {
+                    // fetchTable возвращает объект вида:
+                    // { id: [1,2,3], columnName: [val1, val2, ...], ... }
+                    allData[tableId] = await grist.docApi.fetchTable(tableId);
+                }
+
+                // Выводим результат в формате JSON с отступами
+                output.textContent = JSON.stringify(allData, null, 2);
+            } catch (err) {
+                output.innerHTML = `<span class="error">Ошибка: ${err.message}</span>`;
+                console.error('Ошибка загрузки данных:', err);
+            }
+        }
+
+        // Запускаем загрузку сразу после готовности API
+        loadAllData();
+    </script>
+</body>
+</html>
